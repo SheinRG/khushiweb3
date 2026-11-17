@@ -1,0 +1,300 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>MiniChain</title>
+  <meta name="description" content="A blockchain built from scratch to learn how Web3 works under the hood.">
+  <link rel="icon" href="/favicon.svg" type="image/svg+xml">
+  <!-- Tailwind (browser build) and Motion are vendored locally: no CDN, no build step, no npm. -->
+  <script src="/vendor/tailwind.js"></script>
+  <script src="/vendor/motion.js"></script>
+  <style type="text/tailwindcss">
+    @theme {
+      --font-sans: "Inter", ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+      --font-mono: "JetBrains Mono", "Cascadia Code", ui-monospace, SFMono-Regular, Consolas, monospace;
+      --color-ink: #07090d;
+      --color-panel: #0c1016;
+      --color-line: #1b2230;
+      --color-muted: #8591a5;
+      --color-accent: #3ee6a8;
+      --color-accent-2: #38bdf8;
+      --color-warn: #fbbf24;
+      --color-danger: #f87171;
+    }
+    @layer components {
+      .card { @apply rounded-2xl border border-line bg-panel/75 p-5 backdrop-blur-sm; }
+      .label { @apply text-[11px] font-medium uppercase tracking-[0.14em] text-muted; }
+      .btn { @apply inline-flex items-center justify-center gap-2 rounded-xl px-4 py-2.5 text-sm font-medium transition duration-150 select-none active:scale-[0.97] disabled:pointer-events-none disabled:opacity-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent; }
+      .btn-primary { @apply bg-accent text-ink hover:brightness-110; }
+      .btn-ghost { @apply border border-line bg-white/[0.03] text-slate-200 hover:border-slate-600 hover:bg-white/[0.06]; }
+      .btn-danger { @apply border border-danger/30 bg-danger/10 text-danger hover:bg-danger/20; }
+      .input { @apply w-full rounded-xl border border-line bg-ink/70 px-3.5 py-2.5 text-sm text-white outline-none transition placeholder:text-slate-600 focus:border-accent/60 focus:ring-2 focus:ring-accent/15; }
+      .chip { @apply inline-flex items-center gap-1.5 rounded-full border border-line bg-white/[0.03] px-2.5 py-1 text-xs text-muted; }
+      .tab { @apply relative z-10 rounded-lg px-4 py-2 text-sm font-medium text-muted transition-colors hover:text-white aria-selected:text-white; }
+      .link { @apply cursor-pointer text-accent-2 underline-offset-2 hover:underline; }
+      .h2 { @apply text-base font-semibold tracking-tight text-white; }
+    }
+  </style>
+  <link rel="stylesheet" href="/styles.css">
+</head>
+<body class="min-h-screen bg-ink font-sans text-slate-300 antialiased" style="opacity:0">
+  <div class="bg-aurora" aria-hidden="true"></div>
+  <div class="bg-grid" aria-hidden="true"></div>
+
+  <!-- ─────────────── Header ─────────────── -->
+  <header class="sticky top-0 z-30 border-b border-line/70 bg-ink/70 backdrop-blur-xl">
+    <div class="mx-auto flex max-w-6xl items-center gap-3 px-4 py-3">
+      <a href="#wallet" class="flex items-center gap-2.5" aria-label="MiniChain home">
+        <svg class="h-8 w-8" viewBox="0 0 32 32" fill="none" aria-hidden="true">
+          <rect x="2" y="9" width="12" height="14" rx="3.5" stroke="url(#lg)" stroke-width="2.2"/>
+          <rect x="18" y="9" width="12" height="14" rx="3.5" stroke="url(#lg)" stroke-width="2.2"/>
+          <path d="M14 16h4" stroke="url(#lg)" stroke-width="2.2" stroke-linecap="round"/>
+          <defs><linearGradient id="lg" x1="0" y1="0" x2="32" y2="32"><stop stop-color="#3ee6a8"/><stop offset="1" stop-color="#38bdf8"/></linearGradient></defs>
+        </svg>
+        <span class="text-lg font-semibold tracking-tight text-white">Mini<span class="text-accent">Chain</span></span>
+      </a>
+      <span class="chip hidden md:inline-flex">built from scratch · zero dependencies</span>
+
+      <div class="ml-auto flex items-center gap-2.5">
+        <span id="live" class="relative flex h-2.5 w-2.5" title="Connection to node">
+          <span class="live-ping absolute inline-flex h-full w-full animate-ping rounded-full bg-accent opacity-60"></span>
+          <span class="live-dot relative inline-flex h-2.5 w-2.5 rounded-full bg-accent"></span>
+        </span>
+        <label class="sr-only" for="node-select">Connected node</label>
+        <select id="node-select" class="input w-auto py-1.5 pr-8 font-mono text-xs"></select>
+      </div>
+    </div>
+  </header>
+
+  <main class="mx-auto max-w-6xl px-4 pt-6 pb-28">
+    <!-- ─────────────── Stats ─────────────── -->
+    <section id="stats" class="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5" aria-label="Network stats">
+      <div class="card stat p-4">
+        <p class="label">Chain height</p>
+        <p class="mt-1.5 text-2xl font-semibold tabular-nums text-white" id="stat-height">–</p>
+        <p class="mt-1 text-xs text-muted">blocks after genesis</p>
+      </div>
+      <div class="card stat p-4">
+        <p class="label">Difficulty</p>
+        <p class="mt-1.5 text-2xl font-semibold tabular-nums text-white" id="stat-difficulty">–</p>
+        <p class="mt-1 truncate text-xs text-muted">hash starts with <span id="stat-zeros" class="font-mono text-accent">0</span></p>
+      </div>
+      <div class="card stat p-4">
+        <p class="label">Avg block time</p>
+        <p class="mt-1.5 text-2xl font-semibold tabular-nums text-white" id="stat-blocktime">–</p>
+        <p class="mt-1 text-xs text-muted">target <span id="stat-target">10s</span></p>
+      </div>
+      <div class="card stat p-4">
+        <p class="label">Peers</p>
+        <p class="mt-1.5 text-2xl font-semibold tabular-nums text-white" id="stat-peers">–</p>
+        <p class="mt-1 text-xs text-muted">connected nodes</p>
+      </div>
+      <div class="card stat col-span-2 p-4 sm:col-span-1">
+        <p class="label">Mempool</p>
+        <p class="mt-1.5 text-2xl font-semibold tabular-nums text-white" id="stat-mempool">–</p>
+        <p class="mt-1 text-xs text-muted">pending transactions</p>
+      </div>
+    </section>
+
+    <!-- ─────────────── Tabs ─────────────── -->
+    <nav id="tabs" class="relative mt-7 inline-flex rounded-xl border border-line bg-panel/80 p-1" role="tablist">
+      <span id="tab-indicator" class="absolute top-1 bottom-1 left-0 rounded-lg bg-white/[0.08] ring-1 ring-white/10" aria-hidden="true"></span>
+      <button class="tab" role="tab" data-tab="wallet">Wallet</button>
+      <button class="tab" role="tab" data-tab="explorer">Explorer</button>
+      <button class="tab" role="tab" data-tab="network">Network</button>
+    </nav>
+
+    <!-- ─────────────── Wallet tab ─────────────── -->
+    <section data-panel="wallet" class="mt-5 grid gap-5 lg:grid-cols-5" hidden>
+      <div class="min-w-0 space-y-5 lg:col-span-3">
+        <div class="flex gap-3 rounded-2xl border border-warn/25 bg-warn/[0.06] p-4 text-sm text-amber-200/90" role="note">
+          <svg class="mt-0.5 h-5 w-5 shrink-0 text-warn" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M12 9v4m0 4h.01M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0Z"/></svg>
+          <p><strong class="font-semibold text-warn">Demo only.</strong> Private keys are stored <em>unencrypted</em> in this browser's localStorage. Fine for learning, never for real money.</p>
+        </div>
+
+        <div class="card" id="wallet-card">
+          <div class="flex flex-wrap items-center justify-between gap-3">
+            <div>
+              <h2 class="h2">Your wallets</h2>
+              <p class="text-xs text-muted">Keys are generated in your browser with Web Crypto (ECDSA P-256).</p>
+            </div>
+            <div class="flex gap-2">
+              <label class="btn btn-ghost cursor-pointer" title="Import a wallet JSON file">
+                Import<input type="file" id="wallet-import" accept="application/json,.json" class="sr-only">
+              </label>
+              <button class="btn btn-primary" id="wallet-new">
+                <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>New wallet
+              </button>
+            </div>
+          </div>
+
+          <div id="wallet-chips" class="mt-4 flex flex-wrap gap-2"></div>
+
+          <div id="wallet-empty" class="mt-4 rounded-xl border border-dashed border-line p-8 text-center" hidden>
+            <p class="text-white">No wallet yet</p>
+            <p class="mt-1 text-sm text-muted">Create one, then mine a block to give it some coins.</p>
+          </div>
+
+          <div id="wallet-detail" class="mt-5" hidden>
+            <p class="label">Address</p>
+            <div class="mt-1.5 flex items-center gap-2">
+              <code id="wallet-address" class="min-w-0 flex-1 truncate rounded-lg border border-line bg-ink/70 px-3 py-2 font-mono text-[13px] text-white"></code>
+              <button class="btn btn-ghost px-3" id="wallet-copy" title="Copy address" aria-label="Copy address">
+                <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+              </button>
+            </div>
+
+            <div class="mt-5 grid grid-cols-3 gap-3">
+              <div class="col-span-3 sm:col-span-1">
+                <p class="label">Balance</p>
+                <p class="mt-1 text-4xl font-semibold tabular-nums tracking-tight text-white"><span id="wallet-balance">0</span><span class="ml-1.5 text-base font-medium text-muted">MINI</span></p>
+              </div>
+              <div class="col-span-3 grid grid-cols-2 gap-3 sm:col-span-2">
+                <div class="rounded-xl border border-line bg-ink/40 p-3">
+                  <p class="label">After pending</p>
+                  <p class="mt-1 text-lg font-semibold tabular-nums text-white" id="wallet-pending">0</p>
+                </div>
+                <div class="rounded-xl border border-line bg-ink/40 p-3">
+                  <p class="label" title="Number of transactions sent; prevents replay">Nonce</p>
+                  <p class="mt-1 text-lg font-semibold tabular-nums text-white" id="wallet-nonce">0</p>
+                </div>
+              </div>
+            </div>
+
+            <div class="mt-5 flex flex-wrap gap-2">
+              <button class="btn btn-ghost" id="wallet-export">Export JSON</button>
+              <button class="btn btn-ghost" id="wallet-rename">Rename</button>
+              <button class="btn btn-danger ml-auto" id="wallet-delete">Delete</button>
+            </div>
+          </div>
+        </div>
+
+        <form class="card" id="send-form" novalidate>
+          <h2 class="h2">Send coins</h2>
+          <p class="text-xs text-muted">Signed in your browser. The node only receives the signature, never your private key.</p>
+          <div class="mt-4 space-y-3">
+            <div>
+              <label class="label" for="send-to">Recipient address</label>
+              <input class="input mt-1.5 font-mono" id="send-to" placeholder="40 hex characters" autocomplete="off" spellcheck="false" maxlength="40">
+              <div id="send-quick" class="mt-2 flex flex-wrap gap-1.5"></div>
+            </div>
+            <div class="grid grid-cols-2 gap-3">
+              <div>
+                <label class="label" for="send-amount">Amount</label>
+                <input class="input mt-1.5 tabular-nums" id="send-amount" type="number" min="1" step="1" placeholder="10" inputmode="numeric">
+              </div>
+              <div>
+                <label class="label" for="send-fee">Fee <span class="normal-case tracking-normal text-slate-500">(higher = mined first)</span></label>
+                <input class="input mt-1.5 tabular-nums" id="send-fee" type="number" min="0" step="1" value="1" inputmode="numeric">
+              </div>
+            </div>
+            <button class="btn btn-primary w-full" id="send-btn" type="submit">Sign &amp; broadcast</button>
+          </div>
+          <div id="send-result"></div>
+        </form>
+
+        <div class="card">
+          <div class="flex items-center justify-between">
+            <h2 class="h2">Activity</h2>
+            <span class="text-xs text-muted">this wallet</span>
+          </div>
+          <ul id="activity" class="mt-3 divide-y divide-line/70"></ul>
+        </div>
+      </div>
+
+      <div class="min-w-0 space-y-5 lg:col-span-2">
+        <div class="card relative overflow-hidden" id="mine-card">
+          <div class="mine-glow" aria-hidden="true"></div>
+          <div class="relative">
+            <h2 class="h2">Mining</h2>
+            <p class="text-xs text-muted">Find a nonce whose block hash starts with enough zeros. The reward goes to the selected wallet.</p>
+
+            <div class="mt-4 rounded-xl border border-line bg-ink/70 p-3.5 font-mono text-[12.5px]">
+              <div class="flex justify-between text-muted"><span>target</span><span id="mine-target">000…</span></div>
+              <div class="mt-2 break-all leading-relaxed text-slate-400" id="mine-hash">press “Mine block” to start hashing</div>
+            </div>
+
+            <button class="btn mt-4 w-full bg-linear-to-r from-accent to-accent-2 py-3.5 text-base font-semibold text-ink shadow-[0_8px_30px_-8px] shadow-accent/40 hover:brightness-110" id="mine-btn">
+              <svg class="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" aria-hidden="true"><path d="m14 10-9.5 9.5a2.1 2.1 0 0 1-3-3L11 7"/><path d="M15 3c3.3 0 6 2.7 6 6l-3-1-1-3-3-1z"/><path d="m11 7 6 6"/></svg>
+              <span id="mine-label">Mine block</span>
+            </button>
+
+            <dl id="mine-result" class="mt-4 grid grid-cols-2 gap-2.5" hidden>
+              <div class="rounded-xl border border-line bg-ink/50 p-3"><dt class="label">Block</dt><dd class="mt-0.5 text-lg font-semibold text-white" id="mr-block"></dd></div>
+              <div class="rounded-xl border border-line bg-ink/50 p-3"><dt class="label">Time</dt><dd class="mt-0.5 text-lg font-semibold text-white" id="mr-time"></dd></div>
+              <div class="rounded-xl border border-line bg-ink/50 p-3"><dt class="label">Nonce found</dt><dd class="mt-0.5 text-lg font-semibold tabular-nums text-white" id="mr-nonce"></dd></div>
+              <div class="rounded-xl border border-line bg-ink/50 p-3"><dt class="label">Hashes tried</dt><dd class="mt-0.5 text-lg font-semibold tabular-nums text-white" id="mr-attempts"></dd></div>
+            </dl>
+          </div>
+        </div>
+
+        <div class="card">
+          <h2 class="h2">What happens when you send?</h2>
+          <ol class="mt-3 space-y-3 text-sm">
+            <li class="flex gap-3"><span class="step">1</span><span>Your browser builds the transaction and hashes it (SHA-256).</span></li>
+            <li class="flex gap-3"><span class="step">2</span><span>It signs the hash with your private key (ECDSA). Only you can do this.</span></li>
+            <li class="flex gap-3"><span class="step">3</span><span>The node checks the signature, balance and nonce, adds it to the <b class="text-white">mempool</b> and gossips it to peers.</span></li>
+            <li class="flex gap-3"><span class="step">4</span><span>A miner puts it in a block, finds the proof of work, and every node appends that block.</span></li>
+          </ol>
+        </div>
+      </div>
+    </section>
+
+    <!-- ─────────────── Explorer tab ─────────────── -->
+    <section data-panel="explorer" class="mt-5 space-y-5" hidden>
+      <form id="search-form" class="card flex gap-2 p-3" role="search">
+        <label class="sr-only" for="search-input">Search</label>
+        <input class="input font-mono" id="search-input" placeholder="Block number, transaction hash or address" autocomplete="off" spellcheck="false">
+        <button class="btn btn-primary shrink-0" type="submit">Search</button>
+      </form>
+
+      <div class="card">
+        <div class="flex items-center justify-between gap-3">
+          <h2 class="h2">Latest blocks</h2>
+          <span class="text-xs text-muted">each block points to the hash of the one before it</span>
+        </div>
+        <div id="block-strip" class="scroll-thin -mx-1 mt-4 flex items-stretch gap-0 overflow-x-auto px-1 pb-2"></div>
+      </div>
+
+      <div id="detail" class="card" hidden></div>
+
+      <div class="card">
+        <div class="flex items-center justify-between">
+          <h2 class="h2">Mempool</h2>
+          <span class="text-xs text-muted">valid transactions waiting for a miner</span>
+        </div>
+        <div id="mempool-list" class="mt-3"></div>
+      </div>
+    </section>
+
+    <!-- ─────────────── Network tab ─────────────── -->
+    <section data-panel="network" class="mt-5 grid gap-5 lg:grid-cols-3" hidden>
+      <div class="card min-w-0 lg:col-span-2">
+        <div class="flex items-center justify-between gap-3">
+          <h2 class="h2">Nodes</h2>
+          <span class="text-xs text-muted">same tip colour = same chain</span>
+        </div>
+        <div id="node-list" class="mt-4 space-y-2.5"></div>
+      </div>
+      <div class="space-y-5">
+        <form id="peer-form" class="card">
+          <h2 class="h2">Add a peer</h2>
+          <p class="text-xs text-muted">The selected node will connect and sync with it.</p>
+          <input class="input mt-3 font-mono" id="peer-url" placeholder="http://localhost:3004" autocomplete="off">
+          <button class="btn btn-ghost mt-3 w-full" type="submit">Connect</button>
+        </form>
+        <div class="card text-sm leading-relaxed">
+          <h2 class="h2">How nodes agree</h2>
+          <p class="mt-2">Every node keeps its own full copy of the chain and checks every block itself. New transactions and blocks are broadcast to peers.</p>
+          <p class="mt-2">If two miners find a block at the same time, the network briefly forks. The chain with the most <b class="text-white">cumulative proof of work</b> wins, and transactions from the losing block go back into the mempool.</p>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <div id="toasts" class="pointer-events-none fixed inset-x-4 bottom-4 z-50 flex flex-col items-end gap-2 sm:left-auto" aria-live="polite"></div>
+
+  <script type="module" src="/js/app.js"></script>
+</body>
+</html>
